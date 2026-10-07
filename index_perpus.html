@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Informasi Perpustakaan Sekolah</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Firebase SDKs for Multi-PC Realtime Sync -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .modal-backdrop {
+            background-color: rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Top Header -->
+    <header class="bg-brand-900 text-white sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-brand-100 border border-white/20">
+                    <i class="fa-solid fa-book-bookmark text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">SIPUS Digital</h1>
+                    <p class="text-xs text-brand-100 font-light">Sistem Informasi Perpustakaan Sekolah</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2 sm:space-x-3 text-xs sm:text-sm">
+                <!-- Sync Mode Badge -->
+                <button onclick="openSyncModal()" id="syncStatusBadge" class="flex items-center space-x-2 bg-slate-800/90 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" id="syncStatusDot"></span>
+                    <span id="syncStatusText" class="font-medium text-xs">Lokal (1 PC)</span>
+                    <i class="fa-solid fa-gear text-slate-400 text-xs ml-1"></i>
+                </button>
+
+                <div class="hidden lg:flex items-center bg-brand-800/80 px-3 py-1.5 rounded-lg border border-brand-700/50">
+                    <i class="fa-regular fa-clock mr-2 text-brand-100"></i>
+                    <span id="liveClock" class="font-mono">--:--:--</span>
+                </div>
+                
+                <div class="bg-brand-800 px-3 py-1.5 rounded-lg border border-brand-700 flex items-center">
+                    <i class="fa-solid fa-circle-user mr-2 text-emerald-400"></i>
+                    <span class="font-medium">Petugas</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Body Container -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Navigation Menu Column -->
+        <div class="lg:col-span-3">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 sticky top-22">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-3">Menu Utama</p>
+                <nav class="space-y-1">
+                    <button onclick="switchTab('form-tab')" id="nav-form-tab" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 bg-brand-50 text-brand-700">
+                        <i class="fa-solid fa-file-circle-plus text-base w-5 text-center"></i>
+                        <span>Input Peminjaman</span>
+                    </button>
+                    <button onclick="switchTab('data-tab')" id="nav-data-tab" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+                        <div class="flex items-center space-x-3">
+                            <i class="fa-solid fa-list-check text-base w-5 text-center"></i>
+                            <span>Daftar Transaksi</span>
+                        </div>
+                        <span id="activeBorrowBadge" class="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+                    </button>
+                    <button onclick="switchTab('report-tab')" id="nav-report-tab" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+                        <i class="fa-solid fa-chart-pie text-base w-5 text-center"></i>
+                        <span>Laporan Bulanan</span>
+                    </button>
+                </nav>
+
+                <hr class="my-4 border-slate-100">
+
+                <!-- Multi-PC Cloud Status Widget -->
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-2xs font-bold text-slate-500 uppercase tracking-wider">Multi-PC Sync</span>
+                        <button onclick="openSyncModal()" class="text-2xs text-brand-600 hover:underline font-semibold">Atur</button>
+                    </div>
+                    <p id="cloudWidgetDesc" class="text-xs text-slate-600 leading-relaxed">
+                        Saat ini data tersimpan di 1 komputer. Aktifkan Database Cloud gratis agar 3+ PC terkoneksi otomatis.
+                    </p>
+                </div>
+
+                <!-- Quick Stats Box -->
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                    <p class="text-xs font-medium text-slate-500 mb-2">Ringkasan Hari Ini</p>
+                    <div class="grid grid-cols-2 gap-2 text-center">
+                        <div class="bg-white p-2 rounded-lg border border-slate-200/60 shadow-2xs">
+                            <span class="block text-xs text-slate-500">Dipinjam</span>
+                            <span id="statActiveToday" class="text-base font-bold text-amber-600">0</span>
+                        </div>
+                        <div class="bg-white p-2 rounded-lg border border-slate-200/60 shadow-2xs">
+                            <span class="block text-xs text-slate-500">Kembali</span>
+                            <span id="statReturnedToday" class="text-base font-bold text-emerald-600">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Area Column -->
+        <div class="lg:col-span-9 space-y-6">
+
+            <!-- TAB 1: FORM INPUT PEMINJAMAN -->
+            <div id="form-tab" class="tab-content block">
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                    <div class="flex items-center justify-between pb-4 mb-6 border-b border-slate-100">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-square-plus text-brand-600"></i>
+                                Form Peminjaman Buku
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-1">Isi detail di bawah ini untuk mencatat transaksi peminjaman baru</p>
+                        </div>
+                        <button type="button" onclick="resetBorrowForm()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fa-solid fa-rotate-left mr-1"></i> Reset Form
+                        </button>
+                    </div>
+
+                    <form id="borrowForm" onsubmit="handleBorrowSubmit(event)" class="space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            
+                            <!-- No Anggota -->
+                            <div>
+                                <label for="noAnggota" class="block text-xs font-semibold text-slate-700 mb-1">
+                                    No. Anggota Perpustakaan <span class="text-rose-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                        <i class="fa-solid fa-id-card"></i>
+                                    </span>
+                                    <input type="text" id="noAnggota" required placeholder="Contoh: AGT-2026-001"
+                                        class="w-full pl-9 pr-20 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white focus:outline-none transition">
+                                    <button type="button" onclick="generateAutoMemberId()" class="absolute right-1.5 top-1.5 text-2xs bg-brand-100 hover:bg-brand-200 text-brand-700 font-semibold px-2.5 py-1.5 rounded-lg transition">
+                                        Auto ID
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Nama Lengkap Peminjam -->
+                            <div>
+                                <label for="namaLengkap" class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Nama Lengkap Peminjam <span class="text-rose-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                        <i class="fa-solid fa-user"></i>
+                                    </span>
+                                    <input type="text" id="namaLengkap" required placeholder="Masukkan nama siswa / peminjam"
+                                        class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white focus:outline-none transition">
+                                </div>
+                            </div>
+
+                            <!-- Kelas -->
+                            <div>
+                                <label for="kelas" class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Kelas / Tingkat <span class="text-rose-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                        <i class="fa-solid fa-graduation-cap"></i>
+                                    </span>
+                                    <input type="text" id="kelas" required placeholder="Contoh: X IPA 1, XI IPS 2, XII MIPA" list="classList"
+                                        class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white focus:outline-none transition">
+                                    <datalist id="classList">
+                                        <option value="X IPA 1"></option>
+                                        <option value="X IPA 2"></option>
+                                        <option value="X IPS 1"></option>
+                                        <option value="XI MIPA 1"></option>
+                                        <option value="XI IPS 1"></option>
+                                        <option value="XII MIPA 1"></option>
+                                        <option value="XII IPS 1"></option>
+                                    </datalist>
+                                </div>
+                            </div>
+
+                            <!-- Jumlah Eksemplar -->
+                            <div>
+                                <label for="jumlahEksemplar" class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Jumlah Eksemplar <span class="text-rose-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                        <i class="fa-solid fa-layer-group"></i>
+                                    </span>
+                                    <input type="number" id="jumlahEksemplar" min="1" max="50" value="1" required
+                                        class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white focus:outline-none transition">
+                                </div>
+                            </div>
+
+                            <!-- Judul Buku -->
+                            <div class="md:col-span-2">
+                                <label for="judulBuku" class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Judul Buku <span class="text-rose-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                        <i class="fa-solid fa-book"></i>
+                                    </span>
+                                    <input type="text" id="judulBuku" required placeholder="Contoh: Matematika Dasar Kelas X, Laskar Pelangi, Sejarah Indonesia" list="bookSuggestions"
+                                        class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white focus:outline-none transition">
+                                    <datalist id="bookSuggestions">
+                                        <option value="Fisika Modern Terapan"></option>
+                                        <option value="Kimia Dasar Jilid 1"></option>
+                                        <option value="Biologi Sel dan Genetika"></option>
+                                        <option value="Matematika Tingkat Lanjut"></option>
+                                        <option value="Bahasa Indonesia dan Sastra"></option>
+                                        <option value="English for Academic Purposes"></option>
+                                    </datalist>
+                                </div>
+                            </div>
+
+                            <!-- Guru Pengampu -->
+                            <div class="md:col-span-2">
+                                <label for="guruPengampu" class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Guru Pengampu / Penanggung Jawab <span class="text-rose-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                        <i class="fa-solid fa-chalkboard-user"></i>
+                                    </span>
+                                    <input type="text" id="guruPengampu" required placeholder="Nama guru mata pelajaran / wali kelas"
+                                        class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white focus:outline-none transition">
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- System Note Banner -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex items-start space-x-3 text-xs text-blue-800">
+                            <i class="fa-solid fa-circle-info text-blue-600 text-base mt-0.5"></i>
+                            <div>
+                                <span class="font-semibold block mb-0.5">Pencatatan Otomatis Waktu:</span>
+                                Tanggal dan waktu tepat saat Anda menekan tombol <span class="font-semibold">"Simpan & Pinjam Buku"</span> akan direkam secara otomatis oleh sistem.
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="pt-2 flex items-center justify-end space-x-3">
+                            <button type="button" onclick="resetBorrowForm()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-medium text-slate-700 text-sm hover:bg-slate-100 transition">
+                                Batal
+                            </button>
+                            <button type="submit" class="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center gap-2">
+                                <i class="fa-solid fa-paper-plane"></i>
+                                Simpan & Pinjam Buku
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- TAB 2: DAFTAR TRANSAKSI -->
+            <div id="data-tab" class="tab-content hidden">
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 mb-4 border-b border-slate-100 gap-3">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-clock-rotate-left text-brand-600"></i>
+                                Daftar Transaksi Peminjaman
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Kelola data peminjaman aktif dan riwayat pengembalian buku</p>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button onclick="exportFilteredExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1.5 shadow-2xs">
+                                <i class="fa-solid fa-file-excel text-sm"></i>
+                                Export Excel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search and Filter Tools -->
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-5">
+                        <div class="md:col-span-7 relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                            </span>
+                            <input type="text" id="searchInput" onkeyup="renderTransactionTable()" placeholder="Cari nama, no anggota, judul buku, atau guru..."
+                                class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 focus:bg-white focus:outline-none transition">
+                        </div>
+
+                        <div class="md:col-span-5 flex items-center space-x-2">
+                            <select id="statusFilter" onchange="renderTransactionTable()" class="w-full py-2 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 focus:bg-white focus:outline-none transition">
+                                <option value="ALL">Semua Status (Semua Data)</option>
+                                <option value="DIPINJAM" selected>Sedang Dipinjam (Belum Kembali)</option>
+                                <option value="DIKEMBALIKAN">Sudah Dikembalikan</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Table Container -->
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3 px-3">No</th>
+                                    <th class="py-3 px-3">No. Anggota</th>
+                                    <th class="py-3 px-3">Nama & Kelas</th>
+                                    <th class="py-3 px-3">Detail Buku</th>
+                                    <th class="py-3 px-3">Guru Pengampu</th>
+                                    <th class="py-3 px-3">Waktu Pinjam</th>
+                                    <th class="py-3 px-3">Waktu Kembali</th>
+                                    <th class="py-3 px-3 text-center">Status</th>
+                                    <th class="py-3 px-3 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionTableBody" class="divide-y divide-slate-100 bg-white">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty State Container -->
+                    <div id="emptyTableState" class="hidden py-12 text-center">
+                        <div class="w-16 h-16 mx-auto mb-3 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center">
+                            <i class="fa-solid fa-folder-open text-2xl"></i>
+                        </div>
+                        <p class="font-semibold text-slate-700">Tidak ada transaksi ditemukan</p>
+                        <p class="text-xs text-slate-400 mt-1">Coba ubah kata kunci pencarian atau ubah filter status.</p>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- TAB 3: LAPORAN BULANAN -->
+            <div id="report-tab" class="tab-content hidden">
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-file-invoice text-brand-600"></i>
+                                Laporan Peminjaman Per Bulan
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-1">Pilih bulan dan tahun untuk menghasilkan rekapitulasi laporan dalam format Word atau Excel</p>
+                        </div>
+
+                        <!-- Month and Year Selector -->
+                        <div class="flex items-center space-x-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                            <label for="reportMonth" class="text-xs font-semibold text-slate-600 whitespace-nowrap pl-1">Periode:</label>
+                            <input type="month" id="reportMonth" onchange="renderMonthlyReport()" class="bg-white border border-slate-300 rounded-lg text-xs py-1.5 px-2.5 font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                    </div>
+
+                    <!-- Report Summary Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-brand-50 border border-brand-100 p-4 rounded-xl">
+                            <p class="text-xs font-medium text-brand-700">Total Transaksi Bulan Ini</p>
+                            <h3 id="reportTotalTrans" class="text-2xl font-extrabold text-brand-900 mt-1">0</h3>
+                            <p class="text-2xs text-brand-600 mt-1">Peminjaman tercatat</p>
+                        </div>
+                        <div class="bg-emerald-50 border border-emerald-100 p-4 rounded-xl">
+                            <p class="text-xs font-medium text-emerald-700">Total Buku Dipinjam</p>
+                            <h3 id="reportTotalCopies" class="text-2xl font-extrabold text-emerald-900 mt-1">0</h3>
+                            <p class="text-2xs text-emerald-600 mt-1">Jumlah eksemplar</p>
+                        </div>
+                        <div class="bg-amber-50 border border-amber-100 p-4 rounded-xl">
+                            <p class="text-xs font-medium text-amber-700">Masih Belum Kembali</p>
+                            <h3 id="reportTotalPending" class="text-2xl font-extrabold text-amber-900 mt-1">0</h3>
+                            <p class="text-2xs text-amber-600 mt-1">Status dipinjam</p>
+                        </div>
+                    </div>
+
+                    <!-- Export Toolbar -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <span class="text-xs font-medium text-slate-600" id="reportPeriodTitle">
+                            Menampilkan data laporan periode: -
+                        </span>
+                        
+                        <div class="flex items-center gap-2">
+                            <!-- Export to Word -->
+                            <button onclick="exportReportToWord()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-2xs">
+                                <i class="fa-solid fa-file-word text-sm"></i>
+                                Export Word (.docx)
+                            </button>
+                            
+                            <!-- Export to Excel -->
+                            <button onclick="exportReportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-2xs">
+                                <i class="fa-solid fa-file-excel text-sm"></i>
+                                Export Excel (.xlsx)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Report Table Preview -->
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table id="monthlyReportTable" class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3 px-3">No</th>
+                                    <th class="py-3 px-3">No. Anggota</th>
+                                    <th class="py-3 px-3">Nama Peminjam</th>
+                                    <th class="py-3 px-3">Kelas</th>
+                                    <th class="py-3 px-3">Judul Buku</th>
+                                    <th class="py-3 px-3 text-center">Eks</th>
+                                    <th class="py-3 px-3">Guru Pengampu</th>
+                                    <th class="py-3 px-3">Tanggal Pinjam</th>
+                                    <th class="py-3 px-3">Tanggal Kembali</th>
+                                    <th class="py-3 px-3 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportTableBody" class="divide-y divide-slate-100 bg-white">
+                                <!-- Dynamic Monthly Report Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty Report State -->
+                    <div id="emptyReportState" class="hidden py-10 text-center">
+                        <p class="text-sm font-semibold text-slate-600">Tidak ada data peminjaman untuk periode bulan ini.</p>
+                        <p class="text-xs text-slate-400 mt-1">Pilih bulan lain atau buat transaksi peminjaman baru.</p>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Custom Toast Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- Modal Pengaturan Cloud Multi-PC -->
+    <div id="syncModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="modal-backdrop absolute inset-0" onclick="closeSyncModal()"></div>
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6 relative z-10 border border-slate-200">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center">
+                        <i class="fa-solid fa-network-wired"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-900 text-sm">Pengaturan Multi-PC Sync (Database Cloud)</h3>
+                </div>
+                <button onclick="closeSyncModal()" class="text-slate-400 hover:text-slate-600 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-600 mb-4 leading-relaxed">
+                Agar 3 PC dapat saling terhubung secara real-time, masukkan kunci konfigurasi dari <strong>Firebase Firestore (Gratis)</strong> di bawah ini. Cukup masukkan sekali di tiap PC.
+            </p>
+
+            <div class="space-y-3 mb-5">
+                <div>
+                    <label class="block text-2xs font-bold text-slate-700 mb-1">Paste JSON Config / Keys Firebase:</label>
+                    <textarea id="firebaseConfigInput" rows="5" placeholder='{"apiKey": "AIzaSy...", "authDomain": "...", "projectId": "...", "storageBucket": "...", "messagingSenderId": "...", "appId": "..."}'
+                        class="w-full font-mono text-xs p-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none"></textarea>
+                </div>
+                
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-2xs text-slate-600 space-y-1">
+                    <p class="font-bold text-slate-700"><i class="fa-solid fa-circle-question mr-1 text-brand-600"></i> Cara cepat membuat Database Firebase Gratis (2 Menit):</p>
+                    <ol class="list-decimal pl-4 space-y-0.5 text-slate-500">
+                        <li>Buka <strong>console.firebase.google.com</strong> & login Google</li>
+                        <li>Buat project baru, lalu tambahkan App Web (&lt;/&gt;)</li>
+                        <li>Salin `firebaseConfig` dan paste ke kotak di atas</li>
+                        <li>Buka menu <strong>Firestore Database</strong> &rarr; Create Database &rarr; Start in Test Mode</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                <button type="button" onclick="resetToLocalStorage()" class="text-2xs text-rose-600 font-semibold hover:underline">
+                    Gunakan Mode Offline (Local PC Saja)
+                </button>
+                <div class="flex space-x-2">
+                    <button type="button" onclick="closeSyncModal()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">
+                        Batal
+                    </button>
+                    <button type="button" onclick="saveFirebaseConfig()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-floppy-disk"></i> Simpan & Hubungkan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal Dialog (Replaces native confirm/alert) -->
+    <div id="customModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="modal-backdrop absolute inset-0" onclick="closeCustomModal()"></div>
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 relative z-10 border border-slate-200 transform transition-all scale-100">
+            <div id="modalIconContainer" class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-4 text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 id="modalTitle" class="text-base font-bold text-slate-900 mb-1">Konfirmasi Tindakan</h3>
+            <p id="modalMessage" class="text-xs text-slate-600 mb-6 leading-relaxed">Apakah Anda yakin ingin memproses tindakan ini?</p>
+            <div class="flex items-center justify-end space-x-3">
+                <button type="button" onclick="closeCustomModal()" id="modalCancelBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">
+                    Batal
+                </button>
+                <button type="button" id="modalConfirmBtn" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl transition">
+                    Ya, Lanjutkan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'SIPUS_PERPUSTAKAAN_DATA_V1';
+        const CONFIG_KEY = 'SIPUS_FIREBASE_CONFIG_V1';
+
+        let borrowRecords = [];
+        let db = null;
+        let isCloudMode = false;
+        let unsubscribeFirestore = null;
+
+        window.onload = function() {
+            startLiveClock();
+            setCurrentMonthFilter();
+            
+            // Try Initializing Firebase Cloud Database
+            initFirebaseFromStorage();
+
+            if (!isCloudMode) {
+                loadRecordsFromStorage();
+                if (borrowRecords.length === 0) {
+                    seedInitialData();
+                }
+                renderAll();
+            }
+        };
+
+        function initFirebaseFromStorage() {
+            try {
+                const savedConfig = localStorage.getItem(CONFIG_KEY);
+                if (savedConfig) {
+                    const configObj = JSON.parse(savedConfig);
+                    if (!firebase.apps.length) {
+                        firebase.initializeApp(configObj);
+                    }
+                    db = firebase.firestore();
+                    isCloudMode = true;
+
+                    updateSyncUIStatus(true);
+
+                    // Subscribe to Realtime Updates
+                    if (unsubscribeFirestore) unsubscribeFirestore();
+                    unsubscribeFirestore = db.collection('transactions').onSnapshot((snapshot) => {
+                        borrowRecords = [];
+                        snapshot.forEach((doc) => {
+                            borrowRecords.push(doc.data());
+                        });
+                        // Sort descending by pinjam timestamp
+                        borrowRecords.sort((a, b) => new Date(b.isoPinjam) - new Date(a.isoPinjam));
+                        renderAll();
+                    }, (error) => {
+                        console.error("Firestore error:", error);
+                        showToast("Gagal koneksi ke cloud, beralih ke lokal", "warning");
+                        updateSyncUIStatus(false);
+                    });
+
+                } else {
+                    updateSyncUIStatus(false);
+                }
+            } catch (e) {
+                console.error("Gagal init Firebase:", e);
+                updateSyncUIStatus(false);
+            }
+        }
+
+        function updateSyncUIStatus(cloudActive) {
+            const badge = document.getElementById('syncStatusBadge');
+            const dot = document.getElementById('syncStatusDot');
+            const text = document.getElementById('syncStatusText');
+            const desc = document.getElementById('cloudWidgetDesc');
+
+            if (cloudActive) {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse";
+                text.innerText = "Multi-PC Cloud Sync (Terhubung)";
+                badge.className = "flex items-center space-x-2 bg-emerald-900/80 hover:bg-emerald-900 px-3 py-1.5 rounded-lg border border-emerald-700 transition text-emerald-100";
+                desc.innerText = "Sistem terhubung ke Database Cloud. Perubahan di PC ini akan otomatis sinkron ke 3+ PC lain secara real-time!";
+            } else {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse";
+                text.innerText = "Lokal (1 PC Saja)";
+                badge.className = "flex items-center space-x-2 bg-slate-800/90 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 transition text-slate-200";
+                desc.innerText = "Saat ini data tersimpan lokal di 1 PC. Klik tombol di atas untuk menghubungkan 3 PC bersamaan.";
+            }
+        }
+
+        function openSyncModal() {
+            const savedConfig = localStorage.getItem(CONFIG_KEY);
+            if (savedConfig) {
+                document.getElementById('firebaseConfigInput').value = savedConfig;
+            }
+            document.getElementById('syncModal').classList.remove('hidden');
+        }
+
+        function closeSyncModal() {
+            document.getElementById('syncModal').classList.add('hidden');
+        }
+
+        function saveFirebaseConfig() {
+            const raw = document.getElementById('firebaseConfigInput').value.trim();
+            if (!raw) {
+                showToast("Silakan masukkan JSON konfigurasi Firebase", "warning");
+                return;
+            }
+            try {
+                let parsed = JSON.parse(raw);
+                // Handle if user pasted whole firebaseConfig object snippet
+                if (parsed.apiKey) {
+                    localStorage.setItem(CONFIG_KEY, JSON.stringify(parsed));
+                    closeSyncModal();
+                    showToast("Konfigurasi disimpan! Menghubungkan ke Cloud...", "info");
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showToast("Format JSON Firebase kurang tepat. Pastikan terdapat 'apiKey'", "warning");
+                }
+            } catch (e) {
+                showToast("Format JSON tidak valid. Periksa tanda petik & kurung kurawal.", "warning");
+            }
+        }
+
+        function resetToLocalStorage() {
+            localStorage.removeItem(CONFIG_KEY);
+            closeSyncModal();
+            showToast("Kembali ke mode penyimpanan Lokal (1 PC)", "info");
+            setTimeout(() => location.reload(), 800);
+        }
+
+        function startLiveClock() {
+            const updateClock = () => {
+                const now = new Date();
+                const clockElem = document.getElementById('liveClock');
+                if (clockElem) {
+                    clockElem.innerText = now.toLocaleDateString('id-ID', {
+                        weekday: 'short',
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                    }) + ' ' + now.toLocaleTimeString('id-ID', { hour12: false });
+                }
+            };
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        function setCurrentMonthFilter() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            document.getElementById('reportMonth').value = `${year}-${month}`;
+        }
+
+        function saveRecordsToStorage() {
+            if (isCloudMode) return; // Managed by Firestore
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(borrowRecords));
+            } catch (e) {
+                console.error("Gagal menyimpan ke localStorage:", e);
+            }
+        }
+
+        function loadRecordsFromStorage() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                if (data) {
+                    borrowRecords = JSON.parse(data);
+                }
+            } catch (e) {
+                console.error("Gagal membaca dari localStorage:", e);
+                borrowRecords = [];
+            }
+        }
+
+        function seedInitialData() {
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+            borrowRecords = [
+                {
+                    id: 'REC-' + Date.now() + '-1',
+                    noAnggota: 'AGT-2026-001',
+                    namaLengkap: 'Budi Santoso',
+                    kelas: 'X IPA 1',
+                    judulBuku: 'Fisika Modern Terapan',
+                    jumlahEksemplar: 1,
+                    guruPengampu: 'Drs. Ahmad Dahlan, M.Pd',
+                    waktuPinjam: formatTimestamp(threeDaysAgo),
+                    isoPinjam: threeDaysAgo.toISOString(),
+                    waktuKembali: formatTimestamp(yesterday),
+                    isoKembali: yesterday.toISOString(),
+                    status: 'DIKEMBALIKAN'
+                },
+                {
+                    id: 'REC-' + Date.now() + '-2',
+                    noAnggota: 'AGT-2026-002',
+                    namaLengkap: 'Siti Rahmawati',
+                    kelas: 'XI IPS 2',
+                    judulBuku: 'Sejarah Indonesia Abad 20',
+                    jumlahEksemplar: 2,
+                    guruPengampu: 'Ibu Nurtjahja, S.Pd',
+                    waktuPinjam: formatTimestamp(yesterday),
+                    isoPinjam: yesterday.toISOString(),
+                    waktuKembali: null,
+                    isoKembali: null,
+                    status: 'DIPINJAM'
+                }
+            ];
+            saveRecordsToStorage();
+        }
+
+        function formatTimestamp(dateObj) {
+            const pad = (n) => String(n).padStart(2, '0');
+            const day = pad(dateObj.getDate());
+            const month = pad(dateObj.getMonth() + 1);
+            const year = dateObj.getFullYear();
+            const hours = pad(dateObj.getHours());
+            const minutes = pad(dateObj.getMinutes());
+            const seconds = pad(dateObj.getSeconds());
+            return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+
+            const navForm = document.getElementById('nav-form-tab');
+            const navData = document.getElementById('nav-data-tab');
+            const navReport = document.getElementById('nav-report-tab');
+
+            const activeClass = ['bg-brand-50', 'text-brand-700'];
+            const inactiveClass = ['text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900'];
+
+            [navForm, navData, navReport].forEach(btn => {
+                btn.classList.remove(...activeClass);
+                btn.classList.add(...inactiveClass);
+            });
+
+            if (tabId === 'form-tab') {
+                navForm.classList.add(...activeClass);
+                navForm.classList.remove(...inactiveClass);
+            } else if (tabId === 'data-tab') {
+                navData.classList.add(...activeClass);
+                navData.classList.remove(...inactiveClass);
+            } else if (tabId === 'report-tab') {
+                navReport.classList.add(...activeClass);
+                navReport.classList.remove(...inactiveClass);
+            }
+
+            renderAll();
+        }
+
+        function generateAutoMemberId() {
+            const year = new Date().getFullYear();
+            const randomNum = Math.floor(100 + Math.random() * 900);
+            document.getElementById('noAnggota').value = `AGT-${year}-${randomNum}`;
+            showToast('ID Anggota otomatis berhasil dibuat', 'info');
+        }
+
+        function handleBorrowSubmit(event) {
+            event.preventDefault();
+
+            const noAnggota = document.getElementById('noAnggota').value.trim();
+            const namaLengkap = document.getElementById('namaLengkap').value.trim();
+            const kelas = document.getElementById('kelas').value.trim();
+            const judulBuku = document.getElementById('judulBuku').value.trim();
+            const jumlahEksemplar = parseInt(document.getElementById('jumlahEksemplar').value) || 1;
+            const guruPengampu = document.getElementById('guruPengampu').value.trim();
+
+            if (!noAnggota || !namaLengkap || !kelas || !judulBuku || !guruPengampu) {
+                showToast('Mohon lengkapi semua kolom peminjaman!', 'warning');
+                return;
+            }
+
+            const now = new Date();
+            const recId = 'REC-' + Date.now();
+            const newRecord = {
+                id: recId,
+                noAnggota: noAnggota,
+                namaLengkap: namaLengkap,
+                kelas: kelas,
+                judulBuku: judulBuku,
+                jumlahEksemplar: jumlahEksemplar,
+                guruPengampu: guruPengampu,
+                waktuPinjam: formatTimestamp(now),
+                isoPinjam: now.toISOString(),
+                waktuKembali: null,
+                isoKembali: null,
+                status: 'DIPINJAM'
+            };
+
+            if (isCloudMode && db) {
+                // Save to Firebase Cloud
+                db.collection('transactions').doc(recId).set(newRecord).then(() => {
+                    showToast(`Buku "${judulBuku}" tercatat! (Tersinkron ke Cloud)`, 'success');
+                }).catch((err) => {
+                    showToast("Gagal menyimpan ke cloud: " + err.message, "warning");
+                });
+            } else {
+                // Save to Local Storage
+                borrowRecords.unshift(newRecord);
+                saveRecordsToStorage();
+                showToast(`Berhasil mencatat peminjaman buku "${judulBuku}"!`, 'success');
+                renderAll();
+            }
+
+            resetBorrowForm();
+            switchTab('data-tab');
+        }
+
+        function resetBorrowForm() {
+            document.getElementById('borrowForm').reset();
+            document.getElementById('jumlahEksemplar').value = '1';
+        }
+
+        function returnBook(recordId) {
+            const record = borrowRecords.find(r => r.id === recordId);
+            if (!record) return;
+
+            openCustomModal(
+                'Konfirmasi Pengembalian Buku',
+                `Apakah Anda yakin hendak memproses pengembalian buku "${record.judulBuku}" yang dipinjam oleh ${record.namaLengkap}? Tanggal dan waktu pengembalian akan direkam otomatis saat ini.`,
+                () => {
+                    const now = new Date();
+                    const waktuKembali = formatTimestamp(now);
+                    const isoKembali = now.toISOString();
+
+                    if (isCloudMode && db) {
+                        db.collection('transactions').doc(recordId).update({
+                            status: 'DIKEMBALIKAN',
+                            waktuKembali: waktuKembali,
+                            isoKembali: isoKembali
+                        }).then(() => {
+                            showToast(`Buku "${record.judulBuku}" dikembalikan & tersinkron!`, 'success');
+                        });
+                    } else {
+                        record.status = 'DIKEMBALIKAN';
+                        record.waktuKembali = waktuKembali;
+                        record.isoKembali = isoKembali;
+                        saveRecordsToStorage();
+                        renderAll();
+                        showToast(`Buku "${record.judulBuku}" telah dikembalikan.`, 'success');
+                    }
+                }
+            );
+        }
+
+        function deleteRecord(recordId) {
+            openCustomModal(
+                'Hapus Catatan Peminjaman',
+                'Apakah Anda yakin ingin menghapus data peminjaman ini secara permanen?',
+                () => {
+                    if (isCloudMode && db) {
+                        db.collection('transactions').doc(recordId).delete().then(() => {
+                            showToast('Data peminjaman berhasil dihapus dari cloud.', 'info');
+                        });
+                    } else {
+                        borrowRecords = borrowRecords.filter(r => r.id !== recordId);
+                        saveRecordsToStorage();
+                        renderAll();
+                        showToast('Data peminjaman berhasil dihapus.', 'info');
+                    }
+                }
+            );
+        }
+
+        function renderAll() {
+            renderSummaryBadges();
+            renderTransactionTable();
+            renderMonthlyReport();
+        }
+
+        function renderSummaryBadges() {
+            const activeCount = borrowRecords.filter(r => r.status === 'DIPINJAM').length;
+            document.getElementById('activeBorrowBadge').innerText = activeCount;
+
+            const todayStr = new Date().toLocaleDateString('id-ID');
+            
+            const activeToday = borrowRecords.filter(r => {
+                const datePinjam = new Date(r.isoPinjam).toLocaleDateString('id-ID');
+                return datePinjam === todayStr && r.status === 'DIPINJAM';
+            }).length;
+
+            const returnedToday = borrowRecords.filter(r => {
+                if (!r.isoKembali) return false;
+                const dateKembali = new Date(r.isoKembali).toLocaleDateString('id-ID');
+                return dateKembali === todayStr && r.status === 'DIKEMBALIKAN';
+            }).length;
+
+            document.getElementById('statActiveToday').innerText = activeToday;
+            document.getElementById('statReturnedToday').innerText = returnedToday;
+        }
+
+        function renderTransactionTable() {
+            const tbody = document.getElementById('transactionTableBody');
+            const emptyState = document.getElementById('emptyTableState');
+            const searchKeyword = document.getElementById('searchInput').value.toLowerCase().trim();
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            tbody.innerHTML = '';
+
+            let filtered = borrowRecords.filter(r => {
+                if (statusFilter !== 'ALL' && r.status !== statusFilter) {
+                    return false;
+                }
+                if (searchKeyword !== '') {
+                    const matchName = r.namaLengkap.toLowerCase().includes(searchKeyword);
+                    const matchNo = r.noAnggota.toLowerCase().includes(searchKeyword);
+                    const matchBook = r.judulBuku.toLowerCase().includes(searchKeyword);
+                    const matchTeacher = r.guruPengampu.toLowerCase().includes(searchKeyword);
+                    const matchClass = r.kelas.toLowerCase().includes(searchKeyword);
+                    return matchName || matchNo || matchBook || matchTeacher || matchClass;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filtered.forEach((rec, index) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/80 transition-colors border-b border-slate-100';
+
+                const statusBadge = rec.status === 'DIPINJAM'
+                    ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-amber-100 text-amber-800"><i class="fa-solid fa-clock mr-1"></i> Dipinjam</span>`
+                    : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-emerald-100 text-emerald-800"><i class="fa-solid fa-circle-check mr-1"></i> Dikembalikan</span>`;
+
+                const actionButtons = rec.status === 'DIPINJAM'
+                    ? `<button onclick="returnBook('${rec.id}')" title="Kembalikan Buku" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-2xs transition flex items-center gap-1 shadow-2xs">
+                        <i class="fa-solid fa-arrow-rotate-left"></i> Kembalikan
+                       </button>`
+                    : `<span class="text-2xs text-slate-400 italic">Selesai</span>`;
+
+                tr.innerHTML = `
+                    <td class="py-3 px-3 font-mono text-slate-500">${index + 1}</td>
+                    <td class="py-3 px-3 font-semibold text-brand-700 font-mono">${escapeHtml(rec.noAnggota)}</td>
+                    <td class="py-3 px-3">
+                        <div class="font-bold text-slate-800">${escapeHtml(rec.namaLengkap)}</div>
+                        <div class="text-2xs text-slate-500"><i class="fa-solid fa-graduation-cap"></i> ${escapeHtml(rec.kelas)}</div>
+                    </td>
+                    <td class="py-3 px-3">
+                        <div class="font-semibold text-slate-900">${escapeHtml(rec.judulBuku)}</div>
+                        <div class="text-2xs text-slate-500"><i class="fa-solid fa-copy"></i> ${rec.jumlahEksemplar} Eksemplar</div>
+                    </td>
+                    <td class="py-3 px-3 text-slate-700 font-medium">${escapeHtml(rec.guruPengampu)}</td>
+                    <td class="py-3 px-3 font-mono text-2xs text-slate-600">${rec.waktuPinjam}</td>
+                    <td class="py-3 px-3 font-mono text-2xs text-slate-600">${rec.waktuKembali ? rec.waktuKembali : '<span class="text-slate-300">-</span>'}</td>
+                    <td class="py-3 px-3 text-center">${statusBadge}</td>
+                    <td class="py-3 px-3 text-center">
+                        <div class="flex items-center justify-center space-x-1.5">
+                            ${actionButtons}
+                            <button onclick="deleteRecord('${rec.id}')" title="Hapus Data" class="p-1 text-slate-400 hover:text-rose-600 rounded transition">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderMonthlyReport() {
+            const monthInput = document.getElementById('reportMonth').value;
+            const tbody = document.getElementById('reportTableBody');
+            const emptyState = document.getElementById('emptyReportState');
+
+            if (!monthInput) return;
+
+            const [year, month] = monthInput.split('-');
+            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            const monthLabel = `${monthNames[parseInt(month) - 1]} ${year}`;
+
+            document.getElementById('reportPeriodTitle').innerText = `Menampilkan data laporan periode: ${monthLabel}`;
+
+            tbody.innerHTML = '';
+
+            const filtered = borrowRecords.filter(r => {
+                if (!r.isoPinjam) return false;
+                const dateObj = new Date(r.isoPinjam);
+                const rYear = String(dateObj.getFullYear());
+                const rMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
+                return rYear === year && rMonth === month;
+            });
+
+            const totalTrans = filtered.length;
+            const totalCopies = filtered.reduce((acc, cur) => acc + (parseInt(cur.jumlahEksemplar) || 0), 0);
+            const totalPending = filtered.filter(r => r.status === 'DIPINJAM').length;
+
+            document.getElementById('reportTotalTrans').innerText = totalTrans;
+            document.getElementById('reportTotalCopies').innerText = totalCopies;
+            document.getElementById('reportTotalPending').innerText = totalPending;
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filtered.forEach((rec, index) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors border-b border-slate-100';
+
+                const statusBadge = rec.status === 'DIPINJAM'
+                    ? `<span class="px-2 py-0.5 rounded text-2xs font-bold bg-amber-100 text-amber-800">DIPINJAM</span>`
+                    : `<span class="px-2 py-0.5 rounded text-2xs font-bold bg-emerald-100 text-emerald-800">SELESAI</span>`;
+
+                tr.innerHTML = `
+                    <td class="py-2.5 px-3 font-mono text-slate-500">${index + 1}</td>
+                    <td class="py-2.5 px-3 font-mono font-semibold text-slate-700">${escapeHtml(rec.noAnggota)}</td>
+                    <td class="py-2.5 px-3 font-bold text-slate-800">${escapeHtml(rec.namaLengkap)}</td>
+                    <td class="py-2.5 px-3 text-slate-600">${escapeHtml(rec.kelas)}</td>
+                    <td class="py-2.5 px-3 font-medium text-slate-900">${escapeHtml(rec.judulBuku)}</td>
+                    <td class="py-2.5 px-3 text-center font-bold">${rec.jumlahEksemplar}</td>
+                    <td class="py-2.5 px-3 text-slate-700">${escapeHtml(rec.guruPengampu)}</td>
+                    <td class="py-2.5 px-3 font-mono text-2xs text-slate-600">${rec.waktuPinjam}</td>
+                    <td class="py-2.5 px-3 font-mono text-2xs text-slate-600">${rec.waktuKembali ? rec.waktuKembali : '-'}</td>
+                    <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function exportReportToExcel() {
+            const monthInput = document.getElementById('reportMonth').value;
+            if (!monthInput) return;
+
+            const [year, month] = monthInput.split('-');
+            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            const monthLabel = `${monthNames[parseInt(month) - 1]} ${year}`;
+
+            const filtered = borrowRecords.filter(r => {
+                if (!r.isoPinjam) return false;
+                const dateObj = new Date(r.isoPinjam);
+                return String(dateObj.getFullYear()) === year && String(dateObj.getMonth() + 1).padStart(2, '0') === month;
+            });
+
+            if (filtered.length === 0) {
+                showToast('Tidak ada data pada periode bulan ini untuk diexport.', 'warning');
+                return;
+            }
+
+            const excelData = filtered.map((r, index) => ({
+                'No': index + 1,
+                'No. Anggota': r.noAnggota,
+                'Nama Lengkap Peminjam': r.namaLengkap,
+                'Kelas': r.kelas,
+                'Judul Buku': r.judulBuku,
+                'Jumlah Eksemplar': r.jumlahEksemplar,
+                'Guru Pengampu': r.guruPengampu,
+                'Waktu Pinjam (Otomatis)': r.waktuPinjam,
+                'Waktu Kembali (Otomatis)': r.waktuKembali || 'Belum Dikembalikan',
+                'Status Peminjaman': r.status
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            worksheet['!cols'] = [
+                { wch: 5 }, { wch: 16 }, { wch: 25 }, { wch: 12 }, { wch: 30 },
+                { wch: 10 }, { wch: 25 }, { wch: 22 }, { wch: 22 }, { wch: 15 }
+            ];
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Peminjaman");
+
+            const fileName = `Laporan_Perpustakaan_${monthLabel.replace(' ', '_')}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+            showToast(`Laporan Excel berhasil di-download: ${fileName}`, 'success');
+        }
+
+        function exportFilteredExcel() {
+            if (borrowRecords.length === 0) {
+                showToast('Tidak ada data transaksi untuk diexport.', 'warning');
+                return;
+            }
+
+            const excelData = borrowRecords.map((r, index) => ({
+                'No': index + 1,
+                'No. Anggota': r.noAnggota,
+                'Nama Peminjam': r.namaLengkap,
+                'Kelas': r.kelas,
+                'Judul Buku': r.judulBuku,
+                'Jumlah (Eks)': r.jumlahEksemplar,
+                'Guru Pengampu': r.guruPengampu,
+                'Waktu Pinjam': r.waktuPinjam,
+                'Waktu Kembali': r.waktuKembali || '-',
+                'Status': r.status
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Semua Transaksi");
+            XLSX.writeFile(workbook, `Daftar_Transaksi_Perpustakaan_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast('Daftar transaksi berhasil di-export ke Excel!', 'success');
+        }
+
+        function exportReportToWord() {
+            const monthInput = document.getElementById('reportMonth').value;
+            if (!monthInput) return;
+
+            const [year, month] = monthInput.split('-');
+            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            const monthLabel = `${monthNames[parseInt(month) - 1]} ${year}`;
+
+            const filtered = borrowRecords.filter(r => {
+                if (!r.isoPinjam) return false;
+                const dateObj = new Date(r.isoPinjam);
+                return String(dateObj.getFullYear()) === year && String(dateObj.getMonth() + 1).padStart(2, '0') === month;
+            });
+
+            if (filtered.length === 0) {
+                showToast('Tidak ada data pada periode bulan ini untuk diexport ke Word.', 'warning');
+                return;
+            }
+
+            let tableRows = '';
+            filtered.forEach((r, idx) => {
+                tableRows += `
+                    <tr>
+                        <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 6px;">${escapeHtml(r.noAnggota)}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 6px; font-weight: bold;">${escapeHtml(r.namaLengkap)}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 6px;">${escapeHtml(r.kelas)}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 6px;">${escapeHtml(r.judulBuku)}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${r.jumlahEksemplar}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 6px;">${escapeHtml(r.guruPengampu)}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 6px; font-size: 11px;">${r.waktuPinjam}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 6px; font-size: 11px;">${r.waktuKembali ? r.waktuKembali : '-'}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; font-weight: bold;">${r.status}</td>
+                    </tr>
+                `;
+            });
+
+            const totalCopies = filtered.reduce((acc, cur) => acc + (parseInt(cur.jumlahEksemplar) || 0), 0);
+
+            const wordDocumentContent = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head>
+                    <meta charset="utf-8">
+                    <title>Laporan Peminjaman Perpustakaan</title>
+                    <style>
+                        body { font-family: 'Calibri', 'Arial', sans-serif; margin: 20px; color: #1e293b; }
+                        h2 { text-align: center; margin-bottom: 2px; text-transform: uppercase; color: #0f172a; }
+                        h4 { text-align: center; margin-top: 0; font-weight: normal; color: #475569; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+                        th { background-color: #1e3a8a; color: #ffffff; border: 1px solid #1e3a8a; padding: 8px; text-align: left; }
+                        .summary-box { margin-top: 15px; padding: 10px; background-color: #f8fafc; border: 1px solid #e2e8f0; font-size: 12px; }
+                        .signature-section { margin-top: 40px; float: right; width: 250px; text-align: center; font-size: 12px; }
+                    </style>
+                </head>
+                <body>
+                    <h2>LAPORAN PEMINJAMAN BUKU PERPUSTAKAAN</h2>
+                    <h4>PERIODE: ${monthLabel.toUpperCase()}</h4>
+                    <hr style="border: 1px solid #1e3a8a;" />
+
+                    <div class="summary-box">
+                        <strong>Ringkasan Laporan:</strong><br/>
+                        • Total Peminjaman: ${filtered.length} Transaksi<br/>
+                        • Total Buku Dipinjam: ${totalCopies} Eksemplar<br/>
+                        • Tanggal Cetak Laporan: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>No. Anggota</th>
+                                <th>Nama Peminjam</th>
+                                <th>Kelas</th>
+                                <th>Judul Buku</th>
+                                <th>Eks</th>
+                                <th>Guru Pengampu</th>
+                                <th>Waktu Pinjam</th>
+                                <th>Waktu Kembali</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+
+                    <div class="signature-section">
+                        <p>Mengetahui,<br/><strong>Kepala Perpustakaan</strong></p>
+                        <br/><br/><br/>
+                        <p><u>_________________________</u><br/>NIP. .....................................</p>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob(['\ufeff' + wordDocumentContent], { type: 'application/msword' });
+            const fileName = `Laporan_Perpustakaan_${monthLabel.replace(' ', '_')}.doc`;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast(`Laporan Word berhasil di-download: ${fileName}`, 'success');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+
+            let iconClass = 'fa-circle-info text-blue-500';
+            let borderClass = 'border-blue-200 bg-white';
+
+            if (type === 'success') {
+                iconClass = 'fa-circle-check text-emerald-500';
+                borderClass = 'border-emerald-200 bg-white';
+            } else if (type === 'warning') {
+                iconClass = 'fa-triangle-exclamation text-amber-500';
+                borderClass = 'border-amber-200 bg-white';
+            }
+
+            toast.className = `pointer-events-auto flex items-center space-x-3 px-4 py-3 rounded-xl border shadow-lg text-xs font-medium text-slate-800 transform transition-all duration-300 translate-y-2 opacity-0 ${borderClass}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${iconClass} text-base"></i>
+                <span class="flex-grow">${escapeHtml(message)}</span>
+            `;
+
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        let modalConfirmCallback = null;
+
+        function openCustomModal(title, message, onConfirm) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerText = message;
+            modalConfirmCallback = onConfirm;
+
+            const modal = document.getElementById('customModal');
+            modal.classList.remove('hidden');
+
+            document.getElementById('modalConfirmBtn').onclick = () => {
+                if (modalConfirmCallback) modalConfirmCallback();
+                closeCustomModal();
+            };
+        }
+
+        function closeCustomModal() {
+            document.getElementById('customModal').classList.add('hidden');
+            modalConfirmCallback = null;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>
